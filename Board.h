@@ -23,6 +23,10 @@ public:
 	void CommunityChest(int playerID);
 	void ShuffleCards(queue<int>* deck);
 	void PayBank(int playerID, int amount);
+	void ApplyGameEdits(string inputString);
+	int GetWinningPlayerIndex();
+	int GetTotalTurns();
+	void Clear(string spotsFile);
 
 	//Functions for players
 	void PayPlayer(int payerID, int payeeID, int amount);
@@ -33,8 +37,11 @@ public:
 private:
 	std::vector<spot> spaces;
 	std::vector<player> players;
+	std::vector<string> importedEdits;
 	std::queue<int> chanceDeck;
 	std::queue<int> ccDeck;
-
+	int totalTurns;
+	int winningPlayerIndex;
+	bool didImportFiles;
 };
 

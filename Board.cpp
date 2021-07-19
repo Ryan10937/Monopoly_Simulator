@@ -25,6 +25,10 @@ Board::Board(int numPlayers, string spotsFile)
 	}
 	ShuffleCards(&chanceDeck);
 	ShuffleCards(&ccDeck);
+
+	totalTurns = 0;
+	winningPlayerIndex = 0;
+	didImportFiles = false;
 }
 
 void Board::importSpots(std::string fileName)
@@ -157,108 +161,28 @@ void Board::mainMenu()
 				cout << "Enter the player number followed by the qualities you'd like to change with thier appropriate flags (example below):\n\n" << endl;
 				cout << "-player 2 -money 5000 -pos 15 -property {Boardwalk, Park Place, B. & O. Railroad}\n" << endl;
 				cout << "To show full list of spots, type '-spots'\n" << endl;
+				cout << "To import a series of commands, type 'fileName.txt'\n" << endl;
 				string inputString;
 				getline(cin, inputString);//get rid of newline from cin
 				getline(cin, inputString);
-
-				regex playerEdit("-player (-?\\d+)");
-				regex playerEditMoney("-money (-?\\d+)");
-				regex playerEditPosition("-pos (-?\\d+)");
-				regex playerEditProperty("-property (.*)");
-				regex showPropertiesFlag("-spots");
-				smatch sm;
-				int playerNumber = -1;
-
-				//get show properties flag if available
-				regex_search(inputString, sm, showPropertiesFlag);
-				if (sm.size() > 0) {
-					cout << "\nList of Properties: " << endl;
-					for (int i = 0; i < spaces.size(); i++) {
-						if(spaces.at(i).isNormal || spaces.at(i).name == "Reading Railroad" || spaces.at(i).name == "B. & O. Railroad" || spaces.at(i).name == "Pennsylvania Railroad" || spaces.at(i).name == "Short Line Railroad")
-							cout << spaces.at(i).name << " owned by " << spaces.at(i).ownerID << endl;
-					}
-					cout << endl;
-					continue;
-				}
-
-				//get player number from string
-				regex_search(inputString, sm, playerEdit);
-				if (sm.size() > 0) {
-					playerNumber = stoi(sm[1]);
-					if (playerNumber >= players.size() || playerNumber < 0) {
-						cout << "player number out of range (0-" << players.size() << ")" << endl;
-						continue;
-					}
-					else {
-						cout << "player " << sm[1];
+				regex importEdits("(.*.txt)");
+				smatch matcher;
+				regex_search(inputString, matcher, importEdits);
+				if (matcher.size() > 0) {
+					didImportFiles = true;
+					ifstream inFile;
+					inFile.open(matcher[1].str());
+					string fileString;
+					while (!inFile.eof()) {
+						getline(inFile, fileString);
+						importedEdits.push_back(fileString);
+						ApplyGameEdits(fileString);
 					}
 				}
 				else {
-					cout << "player flag not found" << endl;
-					continue;
+					importedEdits.push_back(inputString);
+					ApplyGameEdits(inputString);
 				}
-
-				//get player money from string
-				regex_search(inputString, sm, playerEditMoney);
-				if (sm.size() > 0) {
-					if (stoi(sm[1]) >= 20000000 || stoi(sm[1]) < 0) {
-						cout << "money value out of range" << endl;
-					}
-					else {
-						cout << " money set to " << sm[1];
-						players.at(playerNumber).SetMoney(stoi(sm[1]));
-					}
-				}
-
-				//get player position from string
-				regex_search(inputString, sm, playerEditPosition);
-				if (sm.size() > 0) {
-					if (stoi(sm[1]) >= spaces.size() || stoi(sm[1]) < 0) {
-						cout << "board index out of range(0-" << spaces.size() <<")" << endl;
-					}
-					else {
-						cout << ", position set to " << sm[1];
-						players.at(playerNumber).SetPosition(stoi(sm[1]));
-					}
-					
-				}
-
-				cout << endl;
-				//get player properties from string
-				//because this is a list of n length, this will have to work a little differently
-				regex_search(inputString, sm, playerEditProperty);
-				vector<string> propertiesToAdd;
-				if (sm.size() > 0) {
-					//property flag was found
-					int lastComma = 1;
-					int thisComma;
-					string match = sm[1];
-					for (int i = 0; i < match.length(); i++) {
-						if (match.at(i) == ',' || match.at(i) == '}') {
-							thisComma = i;
-							propertiesToAdd.push_back(match.substr(lastComma, thisComma - lastComma));
-							lastComma = thisComma + 2;
-						}
-					}
-				}
-
-				for (int i = 0; i < propertiesToAdd.size(); i++) {
-					bool foundProperty = false;
-					for (int j = 0; j < spaces.size(); j++) {
-						if (spaces.at(j).name == propertiesToAdd.at(i)) {
-							spaces.at(j).ownerID = playerNumber;
-							cout << propertiesToAdd.at(i) << " added to " << players.at(playerNumber).GetName() << "'s inventory" << endl;
-							CheckMonopoly(&spaces.at(j)); 
-							foundProperty = true;
-						}
-					}
-					if (!foundProperty) {
-						cout << propertiesToAdd.at(i) << " not found! Property was not added to " << players.at(playerNumber).GetName() << "'s inventory" << endl;
-					}
-				}
-
-
-				cout << endl;
 				break;
 			}
 			
@@ -275,6 +199,9 @@ void Board::takeTurn(int playerID)
 	if (players.at(playerID).GetIsBankrupt()) {
 		return;
 	}
+
+	//increment turn counter
+	totalTurns++;
 	if (players.at(playerID).GetJailCounter() > 0) {
 		players.at(playerID).SetJailCounter(players.at(playerID).GetJailCounter() + 1);
 		if (players.at(playerID).GetJailCounter() < 4) {
@@ -558,8 +485,9 @@ bool Board::IsGameConcluded()
 {
 	int playersWithMoney = 0;
 	for (int i = 0; i < players.size(); i++) {
-		if (players.at(i).GetMoney() > 0) {
+		if (!players.at(i).GetIsBankrupt()) {
 			playersWithMoney++;
+			winningPlayerIndex = i;
 		}
 	}
 	return playersWithMoney == 1;
@@ -856,7 +784,10 @@ void Board::CommunityChest(int playerID)
 
 void Board::ShuffleCards(queue<int>* deck)
 {
-	
+	//pop any extra cards still in deck
+	for (int i = 0; i < deck->size(); i++) {
+		deck->pop();
+	}
 	vector<pair<bool, int>> cardNumbers;
 	for (int i = 0; i < 16; i++) {
 		cardNumbers.push_back(make_pair(true , i));
@@ -897,6 +828,148 @@ void Board::PayBank(int playerID, int amount)
 
 	}
 	
+
+}
+
+void Board::ApplyGameEdits(string inputString)
+{
+	regex playerEdit("-player (-?\\d+)");
+	regex playerEditMoney("-money (-?\\d+)");
+	regex playerEditPosition("-pos (-?\\d+)");
+	regex playerEditProperty("-property (.*)");
+	regex showPropertiesFlag("-spots");
+	smatch sm;
+	int playerNumber = -1;
+	
+	//get show properties flag if available
+	regex_search(inputString, sm, showPropertiesFlag);
+	if (sm.size() > 0) {
+		cout << "\nList of Properties: " << endl;
+		for (int i = 0; i < spaces.size(); i++) {
+			if (spaces.at(i).isNormal || spaces.at(i).name == "Reading Railroad" || spaces.at(i).name == "B. & O. Railroad" || spaces.at(i).name == "Pennsylvania Railroad" || spaces.at(i).name == "Short Line Railroad")
+				cout << spaces.at(i).name << " owned by " << spaces.at(i).ownerID << endl;
+		}
+		cout << endl;
+		return;
+	}
+
+	//get player number from string
+	regex_search(inputString, sm, playerEdit);
+	if (sm.size() > 0) {
+		playerNumber = stoi(sm[1]);
+		if (playerNumber >= players.size() || playerNumber < 0) {
+			cout << "player number out of range (0-" << players.size() << ")" << endl;
+			return;
+		}
+		else {
+			cout << "player " << sm[1];
+		}
+	}
+	else {
+		cout << "player flag not found" << endl;
+		return;
+	}
+
+	//get player money from string
+	regex_search(inputString, sm, playerEditMoney);
+	if (sm.size() > 0) {
+		if (stoi(sm[1]) >= 20000000 || stoi(sm[1]) < 0) {
+			cout << "money value out of range" << endl;
+		}
+		else {
+			cout << " money set to " << sm[1];
+			players.at(playerNumber).SetMoney(stoi(sm[1]));
+		}
+	}
+
+	//get player position from string
+	regex_search(inputString, sm, playerEditPosition);
+	if (sm.size() > 0) {
+		if (stoi(sm[1]) >= spaces.size() || stoi(sm[1]) < 0) {
+			cout << "board index out of range(0-" << spaces.size() << ")" << endl;
+		}
+		else {
+			cout << ", position set to " << sm[1];
+			players.at(playerNumber).SetPosition(stoi(sm[1]));
+		}
+
+	}
+
+	cout << endl;
+	//get player properties from string
+	//because this is a list of n length, this will have to work a little differently
+	regex_search(inputString, sm, playerEditProperty);
+	vector<string> propertiesToAdd;
+	if (sm.size() > 0) {
+		//property flag was found
+		int lastComma = 1;
+		int thisComma;
+		string match = sm[1];
+		for (int i = 0; i < match.length(); i++) {
+			if (match.at(i) == ',' || match.at(i) == '}') {
+				thisComma = i;
+				propertiesToAdd.push_back(match.substr(lastComma, thisComma - lastComma));
+				lastComma = thisComma + 2;
+			}
+		}
+	}
+
+	for (int i = 0; i < propertiesToAdd.size(); i++) {
+		bool foundProperty = false;
+		for (int j = 0; j < spaces.size(); j++) {
+			if (spaces.at(j).name == propertiesToAdd.at(i)) {
+				spaces.at(j).ownerID = playerNumber;
+				cout << propertiesToAdd.at(i) << " added to " << players.at(playerNumber).GetName() << "'s inventory" << endl;
+				CheckMonopoly(&spaces.at(j));
+				foundProperty = true;
+			}
+		}
+		if (!foundProperty) {
+			cout << propertiesToAdd.at(i) << " not found! Property was not added to " << players.at(playerNumber).GetName() << "'s inventory" << endl;
+		}
+	}
+
+
+	cout << endl;
+}
+
+int Board::GetWinningPlayerIndex()
+{
+	return winningPlayerIndex;
+}
+
+int Board::GetTotalTurns()
+{
+	return totalTurns;
+}
+
+void Board::Clear(string spotsFile)
+{
+	int numPlayers = players.size();
+	spaces.clear();
+	players.clear();
+	//load spots
+	importSpots(spotsFile);
+
+	//make base of players
+	for (int i = 0; i < numPlayers; i++) {
+		player newPlayer;
+		newPlayer.SetName("Player " + to_string(i));
+		newPlayer.SetPosition(0);
+		newPlayer.SetID(i);
+		newPlayer.SetIsBankrupt(false);
+		newPlayer.SetJailCounter(0);
+		players.push_back(newPlayer);
+	}
+	ShuffleCards(&chanceDeck);
+	ShuffleCards(&ccDeck);
+
+	totalTurns = 0;
+	winningPlayerIndex = 0;
+	
+	for (int i = 0; i < importedEdits.size(); i++) {
+		ApplyGameEdits(importedEdits.at(i));
+	}
 
 }
 

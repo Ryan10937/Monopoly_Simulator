@@ -125,18 +125,21 @@ void Board::importSpots(std::string fileName)
 	}*/
 }
 
-void Board::mainMenu()
+int Board::mainMenu()
 {
 	std::cout << "Welcome to Monopoly" << std::endl;
 	std::cout << "Choose an option below: " << std::endl;
 
 	std::cout << "1). Start with default settings\n2). Modify settings\n" << std::endl;
+	std::string boardInput;
 	std::string input;
+	std::string gamesInput;
+	int numGames = -1;
 	cin >> input;
 	switch (stoi(input)) {
 	case(1):
 		//do nothing and return to main
-		return;
+		return -1;
 		break;
 	case(2):
 		//change stuff
@@ -145,7 +148,19 @@ void Board::mainMenu()
 			cin >> input;
 			switch (stoi(input)) {
 			case(1):
-				cout << "Not implemented yet :(" << endl;
+				cout << "Choose a board modification category:\n1). Number of Games\n2). Exit" << endl;
+				getline(cin, boardInput);
+				getline(cin, boardInput);
+				switch (stoi(boardInput)) {
+				case(1):
+					cout << "Enter number of games:\n";
+					getline(cin, gamesInput);
+					numGames = stoi(gamesInput);
+					cout << "Number of games set to " << numGames << endl;
+				break;
+				case(2):
+					cout << "Exiting" << endl;
+				}
 				//limit total number of houses?
 				//rent multiplier
 				//verbose?
@@ -192,6 +207,7 @@ void Board::mainMenu()
 		std::cout << "Unexpected input" << std::endl;
 		break;
 	}//end of switch-1
+	return numGames;
 }//end of mainMenu()
 
 void Board::takeTurn(int playerID)

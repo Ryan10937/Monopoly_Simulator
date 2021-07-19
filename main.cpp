@@ -8,15 +8,17 @@ using namespace std;
 int main() {
 	//std::cout << "Welcome to Monopoly!" << std::endl;
 	int option = 2;
-	int numberGames = 1000;
+	int numberGames = 20;
 	int numberTurns = 100;
 	int numberPlayers = 4;
 	string fileString = "newSpots.csv";//file to import monopoly properties and misc spaces from
 	vector<int> winningPlayerHistory;
 	vector<int> winningTurn;
 	Board board(numberPlayers, fileString);//constructor, also calls importSpots 
-	board.mainMenu();//menu to decide to change settings or not
-
+	int possibleGames = board.mainMenu();
+	if (possibleGames != -1) {//menu to decide to change settings or not
+		numberGames = possibleGames;
+	}
 	for (int j = 0; j < numberGames; j++) {
 		//Game is played until 1 player remains
 		bool gameConcluded = false;

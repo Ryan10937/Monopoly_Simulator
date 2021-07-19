@@ -12,7 +12,7 @@ public:
 	//Functions for board
 	Board(int numPlayers, std::string spotsFile);
 	void importSpots(std::string fileName);//make this branched to support non-normal spots
-	void mainMenu();
+	int mainMenu();
 	void takeTurn(int playerID);
 	void landedOnProperty(int playerID, int spotIndex);//takes care of all outcomes for landing on properties
 	void printResults();

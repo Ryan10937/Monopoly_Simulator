@@ -1,7 +1,7 @@
 # Monopoly_Simulator
 Run Monopoly games with various starting properties and more!
 
-## Install
+## Download
 
 1). Download Monopoly_Simulator-main.zip by clicking the "code" dropdown on the main Monopoly_Simulator page and selecting "Download Zip"
 
